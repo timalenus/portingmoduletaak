@@ -47,7 +47,7 @@ function theme_image_max_size_crop_summary(array $variables) {
   $data = $variables['data'];
 
   if ($data['width'] && $data['height']) {
-    return check_plain($data['width']) . 'x' . check_plain($data['height']);
+    return \Drupal\Component\Utility\Html::escape($data['width']) . 'x' . \Drupal\Component\Utility\Html::escape($data['height']);
   }
   else {
     return ($data['width']) ? t('width @width', array('@width' => $data['width'])) : t('height @height', array('@height' => $data['height']));
@@ -91,16 +91,12 @@ function image_max_size_crop_effect(&$image, array $data) {
   $y = image_filter_keyword($y, $image->info['height'], $dimensions['height']);
   if (!image_toolkit_invoke('crop', $image,
       array($x, $y, (int) $dimensions['width'], (int) $dimensions['height']))) {
-    watchdog(
-      'image',
-      'Image crop failed using the %toolkit toolkit on %path (%mimetype, %dimensions)',
-      array(
+    \Drupal::logger('image')->error('Image crop failed using the %toolkit toolkit on %path (%mimetype, %dimensions)', array(
         '%toolkit' => $image->toolkit,
         '%path' => $image->source,
         '%mimetype' => $image->info['mime_type'],
         '%dimensions' => $image->info['width'] . 'x' . $image->info['height'],
-      ),
-      WATCHDOG_ERROR);
+      ));
     return FALSE;
   }
   return TRUE;
