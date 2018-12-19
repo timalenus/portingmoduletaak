@@ -14,7 +14,7 @@ use Drupal\image\ConfigurableImageEffectBase;
  *   description = @Translation("Cropping will remove portions of an image to make it the specified dimensions. This style only resizes when the image dimension(s) is larger than the spedified dimension(s).")
  */
 
-class MaxSizeCropImageEffect extends ConfigurableImageEffectBase {
+class MaxSizeCropImageEffect extends CropImageEffect {
     
 
   public function applyEffect(ImageInterface $image) {
