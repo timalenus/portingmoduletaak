@@ -18,7 +18,25 @@ class MaxSizeCropImageEffect extends CropImageEffect {
     
 
     public function applyEffect(ImageInterface $image) {
-        return TRUE;
+        //als de width leeg is of niet groot genoeg
+	   $original_width = $this->configuration['width'];
+	   if (!$this->configuration['width'] || $this->configuration['width'] > $image->getWidth()) {
+		  $this->configuration['width'] = $image->getWidth();
+	   }
+
+	   //als de height leeg is of niet hoog genoeg
+	   $original_height = $this->configuration['height'];
+	   if (!$this->configuration['height'] || $this->configuration['height'] > $image->getHeight()) {
+		  $this->configuration['height'] = $image->getHeight();
+	   }
+
+	   $result = parent::applyEffect($image);
+
+	   // Restore configuration so that settings screen is shown correctly.
+	   $this->configuration['width'] = $original_width;
+	   $this->configuration['height'] = $original_height;
+
+	   return $result;
     }
     
     public function buildConfigurationForm(array $form, FormStateInterface $form_state) {
