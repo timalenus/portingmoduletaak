@@ -17,9 +17,22 @@ use Drupal\image\ConfigurableImageEffectBase;
 class MaxSizeCropImageEffect extends CropImageEffect {
     
 
-  public function applyEffect(ImageInterface $image) {
-    return TRUE;
-  }
-}
+    public function applyEffect(ImageInterface $image) {
+        return TRUE;
+    }
+    
+    public function buildConfigurationForm(array $form, FormStateInterface $form_state) {
+        $form = parent::buildConfigurationForm($form, $form_state);
+        unset($form['width']['#required']);
+        unset($form['height']['#required']);
+        return $form;
+    }
 
+    public function validateConfigurationForm(array &$form, FormStateInterface $form_state) {
+        parent::validateConfigurationForm($form, $form_state);
+        if ($form_state->isValueEmpty('width') && $form_state->isValueEmpty('height')) {
+            $form_state->setErrorByName('data', $this->t('Width and height can not both be blank.'));
+        }
+    }   
+}
 ?>
