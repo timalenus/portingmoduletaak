@@ -1,0 +1,214 @@
+<?php
+
+/**
+ * @file
+ * Functions needed to create an image style.
+ */
+
+/**
+ * Implements hook_image_effect_info().
+ */
+function image_max_size_crop_image_effect_info() {
+  $effects = array(
+    'image_max_size_crop' => array(
+      'label' => t('Maximum size crop'),
+      'help' => t('Cropping will remove portions of an image to make it the specified dimensions. This style only resizes when the image dimension(s) is larger than the spedified dimension(s).'),
+      'effect callback' => 'image_max_size_crop_effect',
+      'dimensions callback' => 'image_max_size_crop_dimensions',
+      'form callback' => 'image_max_size_crop_form',
+      'summary theme' => 'image_max_size_crop_summary',
+    ),
+  );
+
+  return $effects;
+}
+
+/**
+ * Implements hook_theme().
+ */
+function image_max_size_crop_theme() {
+  return array(
+    'image_max_size_crop_summary' => array(
+      'variables' => array('data' => NULL),
+    ),
+  );
+}
+
+/**
+ * Returns HTML for a summary of an image crop effect.
+ *
+ * @param array $variables
+ *   An associative array containing:
+ *   - data: The current configuration for this crop effect.
+ *
+ * @ingroup themeable
+ */
+function theme_image_max_size_crop_summary(array $variables) {
+  $data = $variables['data'];
+
+  if ($data['width'] && $data['height']) {
+    return check_plain($data['width']) . 'x' . check_plain($data['height']);
+  }
+  else {
+    return ($data['width']) ? t('width @width', array('@width' => $data['width'])) : t('height @height', array('@height' => $data['height']));
+  }
+}
+
+/**
+ * Image effect callback; Resize an image resource.
+ *
+ * @param object $image
+ *   An image object returned by image_load().
+ * @param array $data
+ *   An array of attributes to use when performing the resize effect with the
+ *   following items:
+ *   - "width": An integer representing the desired width in pixels.
+ *   - "height": An integer representing the desired height in pixels.
+ *   - "anchor": A string describing where the crop should originate in the form
+ *     of "XOFFSET-YOFFSET". XOFFSET is either a number of pixels or
+ *     "left", "center", "right" and YOFFSET is either a number of pixels or
+ *     "top", "center", "bottom".
+ *
+ * @return bool
+ *   TRUE on success. FALSE on failure to resize image.
+ */
+function image_max_size_crop_effect(&$image, array $data) {
+  // Set sane default values.
+  $data += array(
+    'width' => NULL,
+    'height' => NULL,
+    'anchor' => 'center-center',
+  );
+
+  $dimensions = $image->info;
+
+  // Crop the dimensions - if they don't change then just return success.
+  if (!image_dimensions_max_size_crop($dimensions, $data['width'], $data['height'])) {
+    return TRUE;
+  }
+  list($x, $y) = explode('-', $data['anchor']);
+  $x = image_filter_keyword($x, $image->info['width'], $dimensions['width']);
+  $y = image_filter_keyword($y, $image->info['height'], $dimensions['height']);
+  if (!image_toolkit_invoke('crop', $image,
+      array($x, $y, (int) $dimensions['width'], (int) $dimensions['height']))) {
+    watchdog(
+      'image',
+      'Image crop failed using the %toolkit toolkit on %path (%mimetype, %dimensions)',
+      array(
+        '%toolkit' => $image->toolkit,
+        '%path' => $image->source,
+        '%mimetype' => $image->info['mime_type'],
+        '%dimensions' => $image->info['width'] . 'x' . $image->info['height'],
+      ),
+      WATCHDOG_ERROR);
+    return FALSE;
+  }
+  return TRUE;
+}
+
+/**
+ * Image dimensions callback; Resize.
+ *
+ * @param array $dimensions
+ *   Dimensions to be modified - an array with components width and height, in
+ *   pixels.
+ * @param array $data
+ *   An array of attributes to use when performing the resize effect with the
+ *   following items:
+ *   - "width": An integer representing the desired width in pixels.
+ *   - "height": An integer representing the desired height in pixels.
+ */
+function image_max_size_crop_dimensions(array &$dimensions, array $data) {
+  if ($dimensions['width'] && $dimensions['height']) {
+    image_dimensions_max_size_crop($dimensions, $data['width'], $data['height']);
+  }
+}
+
+/**
+ * Crop image dimensions when larger than specified dimensions.
+ *
+ * The resulting dimensions can be smaller for one or both target dimensions.
+ *
+ * @param array $dimensions
+ *   Dimensions to be modified - an array with components width and height, in
+ *   pixels.
+ * @param int $width
+ *   The target width, in pixels. If this value is NULL then the cropping will
+ *   be based only on the height value.
+ * @param int $height
+ *   The target height, in pixels. If this value is NULL then the cropping will
+ *   be based only on the width value.
+ *
+ * @return bool
+ *   TRUE if $dimensions was modified, FALSE otherwise.
+ */
+function image_dimensions_max_size_crop(array &$dimensions, $width = NULL, $height = NULL) {
+  // If desired dimensions are set, check if they are larger then
+  // image dimensions.
+  $old_width = $dimensions['width'];
+  $old_height = $dimensions['height'];
+  if ($width && $width < $dimensions['width']) {
+    $dimensions['width'] = $width;
+  }
+  if ($height && $height < $dimensions['height']) {
+    $dimensions['height'] = $height;
+  }
+  if ($dimensions['width'] == $old_width && $dimensions['height'] == $old_height) {
+    return FALSE;
+  }
+  return TRUE;
+}
+
+/**
+ * Form structure for the image max resize form.
+ *
+ * Note that this is not a complete form, it only contains the portion of the
+ * form for configuring the resize options. Therefore it does not not need to
+ * include metadata about the effect, nor a submit button.
+ *
+ * @param array $data
+ *   The current configuration for this resize effect.
+ */
+function image_max_size_crop_form(array $data) {
+  $form['width'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Width'),
+    '#default_value' => isset($data['width']) ? $data['width'] : '',
+    '#field_suffix' => ' ' . t('pixels'),
+    '#size' => 10,
+    '#element_validate' => array('image_effect_integer_validate'),
+    '#allow_negative' => FALSE,
+  );
+  $form['height'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Height'),
+    '#default_value' => isset($data['height']) ? $data['height'] : '',
+    '#field_suffix' => ' ' . t('pixels'),
+    '#size' => 10,
+    '#element_validate' => array('image_effect_integer_validate'),
+    '#allow_negative' => FALSE,
+  );
+  // Reuse validation function from scaling.
+  // Ensures either width or heigth is set.
+  $form['#element_validate'] = array('image_effect_scale_validate');
+
+  $form['anchor'] = array(
+    '#type' => 'radios',
+    '#title' => t('Anchor'),
+    '#options' => array(
+      'left-top'      => t('Top left'),
+      'center-top'    => t('Top center'),
+      'right-top'     => t('Top right'),
+      'left-center'   => t('Center left'),
+      'center-center' => t('Center'),
+      'right-center'  => t('Center right'),
+      'left-bottom'   => t('Bottom left'),
+      'center-bottom' => t('Bottom center'),
+      'right-bottom'  => t('Bottom right'),
+    ),
+    '#theme' => 'image_anchor',
+    '#default_value' => isset($data['anchor']) ? $data['anchor'] : 'center-center',
+    '#description' => t('The part of the image that will be retained during the crop.'),
+  );
+  return $form;
+}
